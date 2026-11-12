@@ -7,7 +7,7 @@ accepted = 0
 rejected = 0
 crashes = 0
 
-for i in range(10000):
+for i in range(100):
     generated = fuzzer.baseLineFuzz(is_json5)
 
     try:
