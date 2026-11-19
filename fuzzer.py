@@ -1,27 +1,8 @@
 from collections import defaultdict
-
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 from fuzzingbook.Grammars import trim_grammar
 from Grammar.json5_grammar import JSON5_GRAMMAR
 from Grammar.toml_grammar import TOML_GRAMMAR
-
-
-def baseLineFuzz(isJson5 : bool):
-    if isJson5:
-        Grammar = trim_grammar(JSON5_GRAMMAR)
-        return GrammarFuzzer(Grammar, start_symbol="<value>", max_nonterminals=10).fuzz()
-    else:
-        Grammar = trim_grammar(TOML_GRAMMAR)
-        return GrammarFuzzer(Grammar, start_symbol="<start>", max_nonterminals=10).fuzz()
-
-def heuristicFuzz(isJson5 : bool):
-    if isJson5:
-        Grammar = trim_grammar(JSON5_GRAMMAR)
-        return HeuristicGrammarFuzzer(Grammar, start_symbol="<value>", max_nonterminals=10).fuzz()
-    else:
-        Grammar = trim_grammar(TOML_GRAMMAR)
-        return HeuristicGrammarFuzzer(Grammar, start_symbol="<start>", max_nonterminals=10).fuzz()
-
 
 import random
 
