@@ -2,13 +2,13 @@ import fuzzer
 import json5
 import tomllib
 
-is_json5 = False
+is_json5 = True
 accepted = 0
 rejected = 0
 crashes = 0
 
 for i in range(10000):
-    generated = fuzzer.baseLineFuzz(is_json5)
+    generated = fuzzer.heuristicFuzz(is_json5)
 
     try:
         if is_json5:
