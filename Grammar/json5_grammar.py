@@ -73,10 +73,7 @@ JSON5_GRAMMAR = {
     "<single-chars>": ["", "<single-char><single-chars>"],
     "<double-char>": ["<plain-char>", "'", "<double-escape>"],
     "<single-char>": ["<plain-char>", '"', "<single-escape>"],
-    "<plain-char>": [
-        "a", "b", "c", "x", "A", "7", "9", " ", "\t", "/", "-", "+",
-        "_", "!", "#", "{", "}", "[", "]", "é", "Ω", "中", "🎼"
-    ],
+    "<plain-char>": [chr(i) for i in range(32, 127) if chr(i) not in ('"', "'", "\\")] + ["é", "Ω", "中", "🎼"],
     "<double-escape>": [
         "\\\\", "\\\"", "\\'", "\\/", "\\n", "\\r", "\\t", "\\v", "\\b", "\\f",
         "\\x41", "\\xE9", "\\u0041", "\\u03A9", "\\uD83C\\uDFBC",

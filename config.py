@@ -8,12 +8,17 @@ from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 from fuzzer import HeuristicGrammarFuzzer
 from Grammar.json5_grammar import JSON5_GRAMMAR
 from Grammar.toml_grammar import TOML_GRAMMAR
+from deepdiff import DeepHash
 
 
 class SUT(Enum):
     JSON5 = "json5"
     TOML = "toml"
+    DEEPHASH = "deephash"
 
+def deephash_sut(source):
+    data = json5.loads(source)
+    return DeepHash(data)
 
 SUT_CONFIG = {
     SUT.JSON5: (
@@ -27,7 +32,14 @@ SUT_CONFIG = {
         tomllib.loads,
         "tomllib",
         "*/tomllib/_parser.py"
-    )
+    ),
+    SUT.DEEPHASH: (
+    JSON5_GRAMMAR,
+    deephash_sut,
+    "deepdiff",
+    "*/deepdiff/deephash.py"
+)
+
 }
 
 
