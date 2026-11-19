@@ -1,4 +1,5 @@
 
+import inspect
 import io
 import coverage
 import csv
@@ -7,6 +8,7 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from fuzzingbook.Grammars import trim_grammar
+from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 
 from config import (
     SUT, SUT_CONFIG,
@@ -39,7 +41,7 @@ def run_experiment(sut, strategy):
     for i in range(1, MAX_TESTS + 1):
         start_time = time.perf_counter()
         generated = generator.fuzz()
-
+    
         cov.start()
         try:
             parser(generated)

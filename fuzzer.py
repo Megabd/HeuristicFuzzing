@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fuzzingbook.GrammarFuzzer import GrammarFuzzer, all_terminals, nonterminals
+from fuzzingbook.GrammarFuzzer import Callable, DerivationTree, GrammarFuzzer, Optional, all_terminals, nonterminals
 
 from fuzzingbook.Grammars import trim_grammar
 from Grammar.json5_grammar import JSON5_GRAMMAR
@@ -22,7 +22,7 @@ def baseLineFuzz(isJson5 : bool):
 def heuristicFuzz(isJson5 : bool):
     if isJson5:
         Grammar = trim_grammar(JSON5_GRAMMAR)
-        return HeuristicGrammarFuzzer(Grammar, start_symbol="<value>", heuristic_weights={"depth": 1.0}, max_nonterminals=30).fuzz()
+        return HeuristicGrammarFuzzer(Grammar, start_symbol="<value>", max_nonterminals=30).fuzz()
     else:
         Grammar = trim_grammar(TOML_GRAMMAR)
         return HeuristicGrammarFuzzer(Grammar, start_symbol="<start>", max_nonterminals=10).fuzz()
@@ -32,7 +32,7 @@ def heuristicFuzz(isJson5 : bool):
 
 class HeuristicGrammarFuzzer(GrammarFuzzer):
 
-    MAX_HEURISTIC_DEPTH = 10
+    MAX_HEURISTIC_DEPTH = 5
 
     def __init__(
         self,
@@ -48,13 +48,18 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         # Default to depth-oriented expansion
         self.heuristic_weights = heuristic_weights or {
-            "depth": 1.0
+            "depth": 0.4,
+            "width": 0.4,
+            "frequency": 0.2
         }
+
+        
 
         # "max" or "weighted"
         self.selection = selection
 
     def expand_node(self, node):
+    
         return self.expand_node_by_heuristic(node)
     # --------------------------------------------------
     # Heuristic cost functions
@@ -113,12 +118,13 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
     # Heuristic selection
     # --------------------------------------------------
 
-    def calculate_heuristic_scores(self, expansions):
+    def calculate_heuristic_scores(self, symbol, expansions):
 
         heuristic_functions = {
             "depth": self.expansion_depth_cost,
             "total": self.expansion_total_cost,
-            "width": self.expansion_width_cost
+            "width": self.expansion_width_cost,
+            "frequency": lambda e: self.expansion_frequency_cost(symbol, e)
         }
 
         scores = [0.0] * len(expansions)
@@ -137,7 +143,6 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
                 for expansion in expansions
             ]
 
-            # Min-max normalization
             minimum = min(raw_scores)
             maximum = max(raw_scores)
 
@@ -158,75 +163,71 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
     # Production selection
     # --------------------------------------------------
 
-    def choose_node_expansion(
-        self, node, children_alternatives, heuristic_scores=None
-    ):
-        symbol, _ = node
-        weights = []
+    def expansion_frequency_cost(self, symbol, expansion):
+        key = (symbol, repr(self.expansion_to_children(expansion)))
+        count = self.production_counts[key]
 
-        for i, alternative in enumerate(children_alternatives):
-            key = (symbol, repr(alternative))
-            count = self.production_counts[key]
+        return 1 / (1 + count)
 
-            weight = 1 / (1 + count)
-
-            if heuristic_scores is not None:
-                weight *= max(heuristic_scores[i], 0.01)
-
-            weights.append(weight)
-
-        selected = random.choices(
-            range(len(children_alternatives)),
-            weights=weights,
-            k=1
-        )[0]
-
-        key = (symbol, repr(children_alternatives[selected]))
+    def update_production_count(self, symbol, expansion):
+        key = (symbol, repr(self.expansion_to_children(expansion)))
         self.production_counts[key] += 1
 
-        return selected
+    
+
+    def select_heuristic_expansion(self, node, children_alternatives, scores):
+
+        if self.selection == "max":
+
+            best_score = max(scores)
+
+            selected_indices = [
+                i for i, score in enumerate(scores)
+                if score == best_score
+            ]
+
+            return random.choice(selected_indices)
+
+        elif self.selection == "weighted":
+
+            weights = [score + 0.01 for score in scores]
+
+            return random.choices(
+                range(len(children_alternatives)),
+                weights=weights,
+                k=1
+            )[0]
+
+        else:
+            raise ValueError(
+                f"Unknown selection strategy: {self.selection}"
+            )
     
     def expand_node_by_heuristic(self, node):
+
 
         symbol, children = node
         assert children is None
 
         expansions = self.grammar[symbol]
 
-        scores = self.calculate_heuristic_scores(expansions)
-
-        if self.selection == "max":
-            best_score = max(scores)
-            selected_indices = [
-                i for i, score in enumerate(scores)
-                if score == best_score
-            ]
-            selection_scores = None
-
-        elif self.selection == "weighted":
-            selected_indices = list(range(len(expansions)))
-            selection_scores = scores
-
-        else:
-            raise ValueError(
-                f"Unknown selection strategy: {self.selection}"
-            )
-
-        selected_expansions = [
-            expansions[i] for i in selected_indices
-        ]
-
-        children_alternatives = [
-            self.expansion_to_children(expansion)
-            for expansion in selected_expansions
-        ]
-
-        index = self.choose_node_expansion(
-            node, children_alternatives, selection_scores
+        scores = self.calculate_heuristic_scores(
+            symbol, expansions
         )
 
-        chosen_expansion = selected_expansions[index]
-        chosen_children = children_alternatives[index]
+        index = self.select_heuristic_expansion(
+            node, expansions, scores
+        )
+
+        chosen_expansion = expansions[index]
+
+        self.update_production_count(
+            symbol, chosen_expansion
+        )
+
+        chosen_children = self.expansion_to_children(
+            chosen_expansion
+        )
 
         chosen_children = self.process_chosen_children(
             chosen_children, chosen_expansion
@@ -245,3 +246,56 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
             )
 
         return self.expand_node_by_heuristic(node)
+
+
+    def expand_tree(self, tree):
+        self.log_tree(tree)
+
+        tree = self.expand_tree_with_strategy(
+            tree,
+            self.expand_node_max_cost,
+            self.min_nonterminals
+        )
+
+        tree = self.expand_tree_with_strategy(
+            tree,
+            self.expand_node_by_heuristic,
+            self.max_nonterminals,
+            max_steps=200
+        )
+
+        tree = self.expand_tree_with_strategy(
+            tree,
+            self.expand_node_min_cost
+        )
+
+        assert self.possible_expansions(tree) == 0
+
+        return tree
+
+    
+    def expand_tree_with_strategy(
+        self,
+        tree: DerivationTree,
+        expand_node_method: Callable,
+        limit: Optional[int] = None,
+        max_steps: Optional[int] = None
+    ):
+        """Expand tree using expand_node_method until the limit
+        is reached or max_steps expansions have been performed."""
+
+        self.expand_node = expand_node_method
+
+        steps = 0
+
+        while (
+            (limit is None or self.possible_expansions(tree) < limit)
+            and self.any_possible_expansions(tree)
+            and (max_steps is None or steps < max_steps)
+        ):
+            tree = self.expand_tree_once(tree)
+            self.log_tree(tree)
+            steps += 1
+
+        return tree
+
