@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer, all_terminals, nonterminals
+
 from fuzzingbook.Grammars import trim_grammar
 from Grammar.json5_grammar import JSON5_GRAMMAR
 from Grammar.toml_grammar import TOML_GRAMMAR
