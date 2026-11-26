@@ -85,7 +85,7 @@ def run_experiment(sut, strategy):
 
         if i in checkpoints:
             pct = cov.report(
-                include=[parser_files],
+                include= parser_files,
                 file=io.StringIO()
             )
 
@@ -119,6 +119,10 @@ def run_experiment(sut, strategy):
     print(f"  Coverage: {pct:.2f}% | Time: {total_time:.3f}s")
     print(f"  Accepted: {accepted} | Rejected: {rejected} | Crashes: {crashes}")
     print(f"  Saved: {filename}\n")
+    cov.html_report(
+    directory=str(output_dir / f"{run_id}_{sut.value}_{strategy.value}_html"),
+    include=parser_files,
+    show_contexts=False)
 
 
 # PowerShell arguments

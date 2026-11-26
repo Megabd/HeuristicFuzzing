@@ -21,7 +21,7 @@ JSON5_GRAMMAR = {
         "<gap><number><gap>", "<gap><string><gap>",
         "<gap><array><gap>", "<gap><object><gap>",
     ],
-    "<gap>": ["", " ", "\t", "\n", "\r\n", "\u00a0", "\u2028", "\u2029",
+    "<gap>": ["", " ", "\t", "\n", "\r\n", "\u00a0", "\u2028", "\u2002", "\u2029",
               "/* comment */", "/*multi\nline*/", "// comment\n", " <gap>"],
 
     "<array>": [
