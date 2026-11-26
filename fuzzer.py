@@ -34,155 +34,103 @@ def heuristicFuzz(isJson5 : bool):
 
 
 
-class HeuristicGrammarFuzzer(GrammarFuzzer):
 
-    MAX_HEURISTIC_DEPTH = 5
+import random
+import math
+from collections import defaultdict
+
+
+class HeuristicGrammarFuzzerFrequency(GrammarFuzzer):
 
     def __init__(
         self,
         grammar,
         *args,
-        heuristic_weights=None,
         selection="max",
+        frequency_function="inverse",
+        normalize_frequency=True,
+        frequency_alpha=0.1,
         **kwargs
     ):
         super().__init__(grammar, *args, **kwargs)
 
         self.production_counts = defaultdict(int)
-        #self.log = True
 
-        # Default to depth-oriented expansion
-        self.heuristic_weights = heuristic_weights or {
-            "depth": 0.0,
-            "width": 0.0,
-            "frequency": 0.7
-        }
-
-        
-
-        # "max" or "weighted"
+        # "max", "weighted", or "random"
         self.selection = selection
 
-    def expand_node(self, node):
-    
-        return self.expand_node_by_heuristic(node)
-    # --------------------------------------------------
-    # Heuristic cost functions
-    # --------------------------------------------------
+        # "inverse", "sqrt", "exponential", or "logarithmic"
+        self.frequency_function = frequency_function
 
-    def symbol_depth_cost(self, symbol, depth=0):
-        if depth >= self.MAX_HEURISTIC_DEPTH:
-            return 0
-
-        return max(
-            self.expansion_depth_cost(e, depth + 1)
-            for e in self.grammar[symbol]
-        )
-
-    def expansion_depth_cost(self, expansion, depth=0):
-        symbols = nonterminals(expansion)
-
-        if not symbols:
-            return 1
-
-        if depth >= self.MAX_HEURISTIC_DEPTH:
-            return 0
-
-        return 1 + max(
-            self.symbol_depth_cost(s, depth)
-            for s in symbols
-        )
-
-    def symbol_total_cost(self, symbol, depth=0):
-        if depth >= self.MAX_HEURISTIC_DEPTH:
-            return 0
-
-        return max(
-            self.expansion_total_cost(e, depth + 1)
-            for e in self.grammar[symbol]
-        )
-
-    def expansion_total_cost(self, expansion, depth=0):
-        symbols = nonterminals(expansion)
-
-        if not symbols:
-            return 1
-
-        if depth >= self.MAX_HEURISTIC_DEPTH:
-            return 0
-
-        return 1 + sum(
-            self.symbol_total_cost(s, depth)
-            for s in symbols
-        )
-
-    def expansion_width_cost(self, expansion):
-        return len(nonterminals(expansion))
+        self.normalize_frequency = normalize_frequency
+        self.frequency_alpha = frequency_alpha
 
     # --------------------------------------------------
-    # Heuristic selection
+    # Production frequency tracking
     # --------------------------------------------------
 
-    def calculate_heuristic_scores(self, symbol, expansions):
+    def expansion_frequency_cost(self, symbol, expansion):
 
-        heuristic_functions = {
-            "depth": self.expansion_depth_cost,
-            "total": self.expansion_total_cost,
-            "width": self.expansion_width_cost,
-            "frequency": lambda e: self.expansion_frequency_cost(symbol, e)
-        }
+        key = (
+            symbol,
+            repr(self.expansion_to_children(expansion))
+        )
 
-        scores = [0.0] * len(expansions)
+        count = self.production_counts[key]
 
-        for heuristic, weight in self.heuristic_weights.items():
+        if self.frequency_function == "inverse":
+            return 1 / (1 + count)
 
-            if heuristic not in heuristic_functions:
-                raise ValueError(
-                    f"Unknown heuristic: {heuristic}"
-                )
+        elif self.frequency_function == "sqrt":
+            return 1 / math.sqrt(1 + count)
 
-            function = heuristic_functions[heuristic]
+        elif self.frequency_function == "exponential":
+            return math.exp(-self.frequency_alpha * count)
 
-            raw_scores = [
-                function(expansion)
-                for expansion in expansions
-            ]
+        elif self.frequency_function == "logarithmic":
+            return -math.log1p(count)
 
-            minimum = min(raw_scores)
-            maximum = max(raw_scores)
+        else:
+            raise ValueError(
+                f"Unknown frequency function: {self.frequency_function}"
+            )
 
-            if maximum == minimum:
-                normalized = [1.0] * len(raw_scores)
-            else:
-                normalized = [
-                    (score - minimum) / (maximum - minimum)
-                    for score in raw_scores
-                ]
+    def update_production_count(self, symbol, expansion):
 
-            for i, score in enumerate(normalized):
-                scores[i] += weight * score
+        key = (
+            symbol,
+            repr(self.expansion_to_children(expansion))
+        )
 
-        return scores
+        self.production_counts[key] += 1
 
     # --------------------------------------------------
     # Production selection
     # --------------------------------------------------
 
-    def expansion_frequency_cost(self, symbol, expansion):
-        key = (symbol, repr(self.expansion_to_children(expansion)))
-        count = self.production_counts[key]
+    def select_heuristic_expansion(self, symbol, expansions):
 
-        return 1 / (1 + count)
+        scores = [
+            self.expansion_frequency_cost(symbol, expansion)
+            for expansion in expansions
+        ]
 
-    def update_production_count(self, symbol, expansion):
-        key = (symbol, repr(self.expansion_to_children(expansion)))
-        self.production_counts[key] += 1
+        if self.normalize_frequency:
+            minimum = min(scores)
+            maximum = max(scores)
 
-    
+            if maximum != minimum:
+                scores = [
+                    (score - minimum) / (maximum - minimum)
+                    for score in scores
+                ]
+            else:
+                scores = [1.0] * len(scores)
 
-    def select_heuristic_expansion(self, node, children_alternatives, scores):
+        if self.selection == "random":
+            return random.randrange(len(expansions))
 
-        if self.selection == "max":
+        elif self.selection == "max":
 
             best_score = max(scores)
 
@@ -195,10 +143,13 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         elif self.selection == "weighted":
 
-            weights = [score + 0.01 for score in scores]
+            weights = [
+                max(0.0, score) + 0.01
+                for score in scores
+            ]
 
             return random.choices(
-                range(len(children_alternatives)),
+                range(len(expansions)),
                 weights=weights,
                 k=1
             )[0]
@@ -207,21 +158,20 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
             raise ValueError(
                 f"Unknown selection strategy: {self.selection}"
             )
-    
-    def expand_node_by_heuristic(self, node):
 
+    # --------------------------------------------------
+    # Heuristic expansion
+    # --------------------------------------------------
+
+    def expand_node_by_heuristic(self, node):
 
         symbol, children = node
         assert children is None
 
         expansions = self.grammar[symbol]
 
-        scores = self.calculate_heuristic_scores(
-            symbol, expansions
-        )
-
         index = self.select_heuristic_expansion(
-            node, expansions, scores
+            symbol, expansions
         )
 
         chosen_expansion = expansions[index]
@@ -240,20 +190,73 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         return (symbol, chosen_children)
 
-    def expand_node_max_heuristic(self, node):
+    # --------------------------------------------------
+    # Cost-based expansion override
+    # --------------------------------------------------
 
-        if self.log:
-            print(
-                "Expanding",
-                all_terminals(node),
-                "using heuristic:",
-                self.heuristic_weights
+    def expand_node_by_cost(
+        self,
+        node: DerivationTree,
+        choose: Callable = min
+    ) -> DerivationTree:
+
+        symbol, children = node
+        assert children is None
+
+        expansions = self.grammar[symbol]
+
+        children_alternatives_with_cost = [
+            (
+                self.expansion_to_children(expansion),
+                self.expansion_cost(expansion, {symbol}),
+                expansion
             )
+            for expansion in expansions
+        ]
 
-        return self.expand_node_by_heuristic(node)
+        costs = [
+            cost for child, cost, expansion
+            in children_alternatives_with_cost
+        ]
 
+        chosen_cost = choose(costs)
+
+        children_with_chosen_cost = [
+            child for child, child_cost, _
+            in children_alternatives_with_cost
+            if child_cost == chosen_cost
+        ]
+
+        expansion_with_chosen_cost = [
+            expansion for _, child_cost, expansion
+            in children_alternatives_with_cost
+            if child_cost == chosen_cost
+        ]
+
+        index = self.choose_node_expansion(
+            node, children_with_chosen_cost
+        )
+
+        chosen_children = children_with_chosen_cost[index]
+        chosen_expansion = expansion_with_chosen_cost[index]
+
+        # Track productions selected during cost-based expansion
+        self.update_production_count(
+            symbol, chosen_expansion
+        )
+
+        chosen_children = self.process_chosen_children(
+            chosen_children, chosen_expansion
+        )
+
+        return (symbol, chosen_children)
+
+    # --------------------------------------------------
+    # Tree expansion
+    # --------------------------------------------------
 
     def expand_tree(self, tree):
+
         self.log_tree(tree)
 
         tree = self.expand_tree_with_strategy(
@@ -276,11 +279,8 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         assert self.possible_expansions(tree) == 0
 
-        #self.log_generated_tree(tree)
-
         return tree
 
-    
     def expand_tree_with_strategy(
         self,
         tree: DerivationTree,
@@ -288,8 +288,6 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
         limit: Optional[int] = None,
         max_steps: Optional[int] = None
     ):
-        """Expand tree using expand_node_method until the limit
-        is reached or max_steps expansions have been performed."""
 
         self.expand_node = expand_node_method
 
@@ -306,14 +304,12 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         return tree
 
-    def log_generated_tree(self, tree, filename="generated_trees.jsonl"):
-        generated_output = tree_to_string(tree)
+    # --------------------------------------------------
+    # Statistics
+    # --------------------------------------------------
 
-        entry = {
-            "generated_output": generated_output
-        }
+    def get_production_statistics(self):
+        return dict(self.production_counts)
 
-        with open(filename, "a", encoding="utf-8") as file:
-            file.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
+    def reset_production_counts(self):
+        self.production_counts.clear()
