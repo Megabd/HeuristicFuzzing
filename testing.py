@@ -12,7 +12,7 @@ from fuzzingbook.MutationFuzzer import mutate
 
 # Capture initialization coverage
 import_cov = coverage.Coverage(
-    source=["json5", "tomlkit", "deepdiff"],
+    source=["json5", "tomlkit", "toml_sort", "ruamel.yaml"],
     branch=True,
     data_file=None
 )
@@ -33,6 +33,11 @@ import_cov.stop()
 def run_experiment(sut, strategy):
     grammar, parser, module, parser_file = SUT_CONFIG[sut]
 
+    parser_files = (
+    parser_file if isinstance(parser_file, list)
+    else [parser_file]
+    )
+
     generator = STRATEGY_CLASSES[strategy](
         trim_grammar(grammar),
         start_symbol="<start>",
@@ -43,7 +48,7 @@ def run_experiment(sut, strategy):
     checkpoints = {1, 5, 10, 25, 50, 100, MAX_TESTS}
     checkpoints.update(range(200, MAX_TESTS + 1, 100))
 
-    cov = coverage.Coverage(include=[parser_file], branch=True)
+    cov = coverage.Coverage(include=parser_files, branch=True)
 
     cov.get_data().update(import_cov.get_data())
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -80,7 +85,7 @@ def run_experiment(sut, strategy):
 
         if i in checkpoints:
             pct = cov.report(
-                include=[parser_file],
+                include=[parser_files],
                 file=io.StringIO()
             )
 

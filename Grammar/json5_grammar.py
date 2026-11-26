@@ -38,10 +38,19 @@ JSON5_GRAMMAR = {
         "name", "true", "false", "null", "Infinity", "NaN", "default",
         "<identifier-start><identifier-rest>",
     ],
-    "<identifier-start>": ["a", "Z", "_", "$", "é", "Ω", "中", "\\u0061"],
+    "<identifier-start>": [
+    "a", "Z", "_", "$", "é", "Ω", "中", "\\u0061",
+    "ʰ",   # Lm - Modifier letter
+    "ǅ",   # Lt - Titlecase letter
+    "Ⅳ",   # Nl - Letter number
+    ],
     "<identifier-rest>": ["", "<identifier-char><identifier-rest>"],
     "<identifier-char>": [
-        "a", "b", "Z", "9", "0", "_", "$", "é", "中", "\u200c", "\u200d"
+    "a", "b", "Z", "9", "0", "_", "$", "é", "中", "\u200c", "\u200d",
+    "\u0301",  # Mn - Nonspacing combining mark
+    "\u093E",  # Mc - Spacing combining mark
+    "٣",       # Nd - Arabic-Indic digit
+    "‿",       # Pc - Connector punctuation
     ],
 
     "<number>": [

@@ -8,17 +8,27 @@ from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 from fuzzer import HeuristicGrammarFuzzer
 from Grammar.json5_grammar import JSON5_GRAMMAR
 from Grammar.toml_grammar import TOML_GRAMMAR
-from deepdiff import DeepHash
+from toml_sort.tomlsort import TomlSort
+from io import StringIO
+from ruamel.yaml import YAML
 
 
 class SUT(Enum):
     JSON5 = "json5"
     TOML = "toml"
-    DEEPHASH = "deephash"
+    TOMLSORT = "tomlsort"
+    YAML = "yaml"
 
-def deephash_sut(source):
+def tomlsort_sut(source):
+    return TomlSort(source).sorted()
+
+yaml = YAML(typ="safe", pure=True)
+
+def yaml_sut(source):
     data = json5.loads(source)
-    return DeepHash(data)
+    output = StringIO()
+    yaml.dump(data, output)
+    return output.getvalue()
 
 SUT_CONFIG = {
     SUT.JSON5: (
@@ -33,13 +43,21 @@ SUT_CONFIG = {
     "tomlkit",
     "*/tomlkit/parser.py"
     ),
-    SUT.DEEPHASH: (
+    SUT.TOMLSORT: (
+    TOML_GRAMMAR,
+    tomlsort_sut,
+    "toml_sort",
+    "*/toml_sort/tomlsort.py"),
+    SUT.YAML: (
     JSON5_GRAMMAR,
-    deephash_sut,
-    "deepdiff",
-    "*/deepdiff/deephash.py"
-)
-
+    yaml_sut,
+    "ruamel.yaml",
+    [
+        "*/ruamel/yaml/representer.py",
+        "*/ruamel/yaml/serializer.py",
+        "*/ruamel/yaml/emitter.py"
+    ]
+),
 }
 
 
@@ -56,7 +74,7 @@ STRATEGY_CLASSES = {
 
 DEFAULT_SUT = SUT.JSON5
 DEFAULT_STRATEGY = Strategy.BASELINE
-MAX_TESTS = 2000
+MAX_TESTS = 200
 MAX_NONTERMINALS = 30
 MUTATION_RATE = 0.30
 MAX_MUTATIONS = 3

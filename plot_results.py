@@ -41,7 +41,15 @@ def plot(runs, x_column, x_label, output_name):
             # Include the run's time so repeated experiments stay distinguishable.
             label = f"{run['strategy']} ({run['run_id']})"
             ax.plot(run[x_column], run["coverage_pct"], marker=".", label=label)
-
+        
+        # Start Y-axis near the coverage achieved after the first input
+        first_coverage = min(
+            run["coverage_pct"][0]
+            for run in runs
+            if run["parser"] == parser
+        )
+        y_min = (first_coverage // 5) * 5
+        ax.set_ylim(bottom=y_min)
         ax.set_title(parser.upper())
         ax.set_xlabel(x_label)
         ax.set_ylabel("Coverage (%)")
