@@ -1,16 +1,14 @@
 
-import inspect
 import io
-from random import randrange
 import coverage
 import csv
 import time
 import argparse
+import random
 from pathlib import Path
 from datetime import datetime
 from fuzzingbook.Grammars import trim_grammar
-from fuzzingbook.GrammarFuzzer import GrammarFuzzer
-from fuzzingbook.MutationFuzzer import MutationFuzzer
+from fuzzingbook.MutationFuzzer import mutate
 
 # Capture initialization coverage
 import_cov = coverage.Coverage(
@@ -25,7 +23,8 @@ from config import (
     SUT, SUT_CONFIG,
     Strategy, STRATEGY_CLASSES,
     DEFAULT_SUT, DEFAULT_STRATEGY,
-    MAX_TESTS, MAX_NONTERMINALS
+    MAX_TESTS, MAX_NONTERMINALS,
+    MUTATION_RATE, MAX_MUTATIONS
 )
 
 import_cov.stop()
@@ -40,12 +39,6 @@ def run_experiment(sut, strategy):
         max_nonterminals=MAX_NONTERMINALS
     )
 
-    mutationFuzzer = MutationFuzzer(
-    seed=["initial seed"],
-    min_mutations=1,
-    max_mutations=7
-    )
-
     # Coverage checkpoints
     checkpoints = {1, 5, 10, 25, 50, 100, MAX_TESTS}
     checkpoints.update(range(200, MAX_TESTS + 1, 100))
@@ -58,25 +51,22 @@ def run_experiment(sut, strategy):
     results = []
     accepted = rejected = crashes = 0
     total_time = 0.0
-
+    mutated_count = 0
+    
     for i in range(1, MAX_TESTS + 1):
         start_time = time.perf_counter()
         generated = generator.fuzz()
 
-        mutateFuzz = randrange(1,10, 2) >= 1
+        # Occasionally mutate the grammar-generated input
+        if random.random() < MUTATION_RATE:
+            for _ in range(random.randint(1, MAX_MUTATIONS)):
+                generated = mutate(generated)
+            mutated_count += 1
 
-        if mutateFuzz:
-            mutationFuzzer.seed = [generated]
-            #mutationFuzzer.reset()
-            mutateGenerated = mutationFuzzer.fuzz()
-    
         cov.start()
         try:
             parser(generated)
             accepted += 1
-            if mutateFuzz:
-                parser(mutateGenerated)
-                accepted += 1
 
         except ValueError:
             rejected += 1
@@ -103,7 +93,8 @@ def run_experiment(sut, strategy):
                 "elapsed_seconds": round(total_time, 4),
                 "accepted": accepted,
                 "rejected": rejected,
-                "crashes": crashes
+                "crashes": crashes,
+                "mutated": mutated_count,
             })
 
     cov.save()
