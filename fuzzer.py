@@ -8,6 +8,10 @@ from Grammar.toml_grammar import TOML_GRAMMAR
 import inspect
 import random
 from collections import defaultdict
+import json
+from fuzzingbook.GrammarFuzzer import tree_to_string
+
+
 
 
 
@@ -45,12 +49,13 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
         super().__init__(grammar, *args, **kwargs)
 
         self.production_counts = defaultdict(int)
+        #self.log = True
 
         # Default to depth-oriented expansion
         self.heuristic_weights = heuristic_weights or {
-            "depth": 0.4,
-            "width": 0.4,
-            "frequency": 0.2
+            "depth": 0.0,
+            "width": 0.0,
+            "frequency": 0.7
         }
 
         
@@ -271,6 +276,8 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
 
         assert self.possible_expansions(tree) == 0
 
+        #self.log_generated_tree(tree)
+
         return tree
 
     
@@ -298,4 +305,15 @@ class HeuristicGrammarFuzzer(GrammarFuzzer):
             steps += 1
 
         return tree
+
+    def log_generated_tree(self, tree, filename="generated_trees.jsonl"):
+        generated_output = tree_to_string(tree)
+
+        entry = {
+            "generated_output": generated_output
+        }
+
+        with open(filename, "a", encoding="utf-8") as file:
+            file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 
