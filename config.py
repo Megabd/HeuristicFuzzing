@@ -5,7 +5,7 @@ import json5
 import tomlkit
 
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer
-from fuzzer import HeuristicGrammarFuzzer
+from fuzzer import HeuristicGrammarFuzzerFrequency
 from Grammar.json5_grammar import JSON5_GRAMMAR
 from Grammar.toml_grammar import TOML_GRAMMAR
 from toml_sort.tomlsort import TomlSort
@@ -68,7 +68,7 @@ class Strategy(Enum):
 
 STRATEGY_CLASSES = {
     Strategy.BASELINE: GrammarFuzzer,
-    Strategy.HEURISTIC: HeuristicGrammarFuzzer
+    Strategy.HEURISTIC: HeuristicGrammarFuzzerFrequency
 }
 
 
@@ -77,4 +77,4 @@ DEFAULT_STRATEGY = Strategy.BASELINE
 MAX_TESTS = 200
 MAX_NONTERMINALS = 30
 MUTATION_RATE = 0.30
-MAX_MUTATIONS = 3
+MAX_MUTATIONS = 5
