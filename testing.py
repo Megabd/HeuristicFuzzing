@@ -1,6 +1,7 @@
 
 import inspect
 import io
+from random import randrange
 import coverage
 import csv
 import time
@@ -9,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from fuzzingbook.Grammars import trim_grammar
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer
+from fuzzingbook.MutationFuzzer import MutationFuzzer
 
 # Capture initialization coverage
 import_cov = coverage.Coverage(
@@ -38,6 +40,12 @@ def run_experiment(sut, strategy):
         max_nonterminals=MAX_NONTERMINALS
     )
 
+    mutationFuzzer = MutationFuzzer(
+    seed=["initial seed"],
+    min_mutations=1,
+    max_mutations=7
+    )
+
     # Coverage checkpoints
     checkpoints = {1, 5, 10, 25, 50, 100, MAX_TESTS}
     checkpoints.update(range(200, MAX_TESTS + 1, 100))
@@ -54,11 +62,21 @@ def run_experiment(sut, strategy):
     for i in range(1, MAX_TESTS + 1):
         start_time = time.perf_counter()
         generated = generator.fuzz()
+
+        mutateFuzz = randrange(1,10, 2) >= 1
+
+        if mutateFuzz:
+            mutationFuzzer.seed = [generated]
+            #mutationFuzzer.reset()
+            mutateGenerated = mutationFuzzer.fuzz()
     
         cov.start()
         try:
             parser(generated)
             accepted += 1
+            if mutateFuzz:
+                parser(mutateGenerated)
+                accepted += 1
 
         except ValueError:
             rejected += 1
