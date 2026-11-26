@@ -2,7 +2,7 @@
 from enum import Enum
 
 import json5
-import tomllib
+import tomlkit
 
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 from fuzzer import HeuristicGrammarFuzzer
@@ -28,10 +28,10 @@ SUT_CONFIG = {
         "*/json5/parser.py"
     ),
     SUT.TOML: (
-        TOML_GRAMMAR,
-        tomllib.loads,
-        "tomllib",
-        "*/tomllib/_parser.py"
+    TOML_GRAMMAR,
+    tomlkit.loads,
+    "tomlkit",
+    "*/tomlkit/parser.py"
     ),
     SUT.DEEPHASH: (
     JSON5_GRAMMAR,

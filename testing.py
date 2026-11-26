@@ -10,12 +10,23 @@ from datetime import datetime
 from fuzzingbook.Grammars import trim_grammar
 from fuzzingbook.GrammarFuzzer import GrammarFuzzer
 
+# Capture initialization coverage
+import_cov = coverage.Coverage(
+    source=["json5", "tomlkit", "deepdiff"],
+    branch=True,
+    data_file=None
+)
+
+import_cov.start()
+
 from config import (
     SUT, SUT_CONFIG,
     Strategy, STRATEGY_CLASSES,
     DEFAULT_SUT, DEFAULT_STRATEGY,
     MAX_TESTS, MAX_NONTERMINALS
 )
+
+import_cov.stop()
 
 
 def run_experiment(sut, strategy):
@@ -31,7 +42,9 @@ def run_experiment(sut, strategy):
     checkpoints = {1, 5, 10, 25, 50, 100, MAX_TESTS}
     checkpoints.update(range(200, MAX_TESTS + 1, 100))
 
-    cov = coverage.Coverage(source=[module], branch=True)
+    cov = coverage.Coverage(include=[parser_file], branch=True)
+
+    cov.get_data().update(import_cov.get_data())
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
     results = []
